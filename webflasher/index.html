@@ -153,12 +153,6 @@
 <body>
     <div class="container">
         <h1>OL-33 FLASHER</h1>
-        
-        <div class="port-select">
-            <select id="portSelect">
-                <option value="">Select port...</option>
-            </select>
-        </div>
 
         <button class="btn btn-connect" id="connectBtn">CONNECT</button>
         <button class="btn btn-flash" id="flashBtn" disabled>FLASH</button>
@@ -175,35 +169,7 @@
         
         let serialPort = null;
         let isConnected = false;
-        const FIRMWARE_PATH = './firmwares/esp32fw.bin';
-
-        // Update port list
-        async function updatePortList() {
-            if (!navigator.serial) {
-                return;
-            }
-
-            try {
-                const ports = await navigator.serial.getPorts();
-                const select = document.getElementById('portSelect');
-                select.innerHTML = '<option value="">Select port...</option>';
-                
-                ports.forEach((port, index) => {
-                    const option = document.createElement('option');
-                    option.value = index;
-                    option.textContent = port.getInfo().usbVendorId 
-                        ? `Port ${index + 1} (VID: 0x${port.getInfo().usbVendorId.toString(16)}, PID: 0x${port.getInfo().usbProductId.toString(16)})`
-                        : `Port ${index + 1}`;
-                    select.appendChild(option);
-                });
-
-                if (ports.length === 0) {
-                    select.innerHTML = '<option value="">No ports available. Click CONNECT to select.</option>';
-                }
-            } catch (error) {
-                console.error('Error getting ports:', error);
-            }
-        }
+        const FIRMWARE_PATH = './webflasher/firmwares/esp32fw.bin';
 
         // Connect to serial port
         async function connectSerial() {
@@ -219,18 +185,8 @@
                     return;
                 }
 
-                // Request port if not selected
-                const select = document.getElementById('portSelect');
-                let port;
-
-                if (select.value !== '') {
-                    // Use previously selected port
-                    const ports = await navigator.serial.getPorts();
-                    port = ports[parseInt(select.value)];
-                } else {
-                    // Request new port
-                    port = await navigator.serial.requestPort();
-                }
+                // Request port - opens dialog to select device
+                const port = await navigator.serial.requestPort();
 
                 serialPort = port;
                 // Don't open port here - esp-web-tools will handle it
@@ -238,9 +194,6 @@
 
                 isConnected = true;
                 updateUI();
-                
-                // Update port list after connection
-                await updatePortList();
 
             } catch (error) {
                 console.error('Connection error:', error);
@@ -272,7 +225,6 @@
                 serialPort = null;
                 isConnected = false;
                 updateUI();
-                await updatePortList();
             } catch (error) {
                 console.error('Disconnect error:', error);
                 // Port might already be closed
@@ -360,7 +312,6 @@
         document.getElementById('flashBtn').addEventListener('click', flashFirmware);
 
         // Initialize
-        updatePortList();
         updateUI();
     </script>
 </body>
