@@ -111,23 +111,9 @@
         const flashEl = document.getElementById("flashEl");
         const flashBtn = document.getElementById("flashBtn");
 
-        // Create manifest inline
-        const manifest = {
-            name: "OL-33 Firmware",
-            version: "1.0",
-            builds: [
-                {
-                    chipFamily: "ESP32-S3",
-                    parts: [
-                        { path: "./webflasher/firmwares/esp32fw.bin", offset: 0 }
-                    ]
-                }
-            ]
-        };
-
-        // Set manifest on the button
+        // Set manifest URL on the button
         if (flashEl) {
-            flashEl.manifest = manifest;
+            flashEl.setAttribute('manifest', './webflasher/manifest.json');
         }
 
         // Enable button
