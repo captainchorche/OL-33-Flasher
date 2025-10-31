@@ -259,8 +259,8 @@
                     ]
                 };
 
-                // Dynamically import esp-web-tools (using esm.sh for better CORS support)
-                const { install } = await import('https://esm.sh/esp-web-tools@10/dist/web/install.js');
+                // Dynamically import esp-web-tools (using jsdelivr CDN for better CORS support)
+                const { install } = await import('https://cdn.jsdelivr.net/npm/esp-web-tools@10/dist/web/install.js');
 
                 // Use esp-web-tools install function
                 await install(manifest, {
