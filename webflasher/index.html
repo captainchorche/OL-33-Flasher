@@ -153,6 +153,12 @@
 <body>
     <div class="container">
         <h1>OL-33 FLASHER</h1>
+        
+        <div class="port-select">
+            <select id="portSelect">
+                <option value="">Select port...</option>
+            </select>
+        </div>
 
         <button class="btn btn-connect" id="connectBtn">CONNECT</button>
         <button class="btn btn-flash" id="flashBtn" disabled>FLASH</button>
@@ -165,9 +171,39 @@
     </div>
 
     <script type="module">
+        import { install } from 'https://unpkg.com/esp-web-tools@10/dist/web/install.js';
+        
         let serialPort = null;
         let isConnected = false;
         const FIRMWARE_PATH = './webflasher/firmwares/esp32fw.bin';
+
+        // Update port list
+        async function updatePortList() {
+            if (!navigator.serial) {
+                return;
+            }
+
+            try {
+                const ports = await navigator.serial.getPorts();
+                const select = document.getElementById('portSelect');
+                select.innerHTML = '<option value="">Select port...</option>';
+                
+                ports.forEach((port, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = port.getInfo().usbVendorId 
+                        ? `Port ${index + 1} (VID: 0x${port.getInfo().usbVendorId.toString(16)}, PID: 0x${port.getInfo().usbProductId.toString(16)})`
+                        : `Port ${index + 1}`;
+                    select.appendChild(option);
+                });
+
+                if (ports.length === 0) {
+                    select.innerHTML = '<option value="">No ports available. Click CONNECT to select.</option>';
+                }
+            } catch (error) {
+                console.error('Error getting ports:', error);
+            }
+        }
 
         // Connect to serial port
         async function connectSerial() {
@@ -183,8 +219,18 @@
                     return;
                 }
 
-                // Request port - opens dialog to select device
-                const port = await navigator.serial.requestPort();
+                // Request port if not selected
+                const select = document.getElementById('portSelect');
+                let port;
+
+                if (select.value !== '') {
+                    // Use previously selected port
+                    const ports = await navigator.serial.getPorts();
+                    port = ports[parseInt(select.value)];
+                } else {
+                    // Request new port
+                    port = await navigator.serial.requestPort();
+                }
 
                 serialPort = port;
                 // Don't open port here - esp-web-tools will handle it
@@ -192,6 +238,9 @@
 
                 isConnected = true;
                 updateUI();
+                
+                // Update port list after connection
+                await updatePortList();
 
             } catch (error) {
                 console.error('Connection error:', error);
@@ -223,6 +272,7 @@
                 serialPort = null;
                 isConnected = false;
                 updateUI();
+                await updatePortList();
             } catch (error) {
                 console.error('Disconnect error:', error);
                 // Port might already be closed
@@ -240,6 +290,7 @@
             }
 
             try {
+                document.getElementById('status').textContent = 'Preparing flash...';
                 document.getElementById('flashBtn').disabled = true;
                 document.getElementById('progress').classList.add('show');
                 document.getElementById('progressFill').style.width = '0%';
@@ -259,21 +310,6 @@
                     ]
                 };
 
-                // Dynamically import esp-web-tools
-                // Try different CDNs if one fails
-                let install;
-                try {
-                    const module = await import('https://unpkg.com/esp-web-tools@10/dist/web/install.js?module');
-                    install = module.install;
-                } catch (e1) {
-                    try {
-                        const module = await import('https://cdn.jsdelivr.net/npm/esp-web-tools@10/dist/web/install.js');
-                        install = module.install;
-                    } catch (e2) {
-                        throw new Error('Failed to load esp-web-tools. Make sure you are using HTTPS (GitHub Pages) or try a different browser.');
-                    }
-                }
-
                 // Use esp-web-tools install function
                 await install(manifest, {
                     port: serialPort,
@@ -284,13 +320,13 @@
                     }
                 });
 
-                alert('Firmware flashed successfully!');
+                document.getElementById('status').textContent = 'Firmware flashed successfully!';
                 document.getElementById('progress').classList.remove('show');
                 document.getElementById('flashBtn').disabled = false;
 
             } catch (error) {
                 console.error('Flash error:', error);
-                alert('Flash failed: ' + error.message);
+                document.getElementById('status').textContent = 'Flash failed: ' + error.message;
                 document.getElementById('progress').classList.remove('show');
                 document.getElementById('flashBtn').disabled = false;
                 
@@ -324,6 +360,7 @@
         document.getElementById('flashBtn').addEventListener('click', flashFirmware);
 
         // Initialize
+        updatePortList();
         updateUI();
     </script>
 </body>
