@@ -178,9 +178,20 @@
         .hidden {
             display: none !important;
         }
+
+        /* ESP Web Tools customization via CSS variables */
+        esp-web-install-button {
+            --esp-tools-button-color: #A6FAFF;
+            --esp-tools-button-text-color: #000;
+        }
     </style>
-    <!-- ESP Web Tools -->
-    <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+    <!-- ESP Web Tools - Custom build with modified messages -->
+    <!-- Customization:
+        - Text slots: activate, unsupported, not-allowed
+        - CSS variables: --esp-tools-button-color, --esp-tools-button-text-color
+        - Flash dialog messages are customized in source code
+    -->
+    <script type="module" src="./lib/esp-web-tools/install-button.js?module"></script>
     <!-- Firebase -->
     <script type="module" src="./firebase-config.js"></script>
 </head>
