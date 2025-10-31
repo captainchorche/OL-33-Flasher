@@ -6,7 +6,8 @@
     {
       "chipFamily": "ESP32-S3",
       "parts": [
-        { "path": "./firmwares/esp32fw.bin", "offset": 0 }
+        
+        { "path": "./firmwares/OL33.bin", "offset": 0 }
       ]
     }
   ]
