@@ -204,11 +204,6 @@
 
         <!-- Flash Area (shown after login) -->
         <div id="flashContainer" class="hidden">
-            <div class="user-info">
-                <div>Logged in as: <strong id="userEmail"></strong></div>
-                <button id="logoutBtn" class="btn logout-btn">LOGOUT</button>
-            </div>
-
             <!-- Admin Panel (only for admins) -->
             <div id="adminPanel" class="admin-panel hidden">
                 <h3>Admin Panel - Create User</h3>
@@ -245,9 +240,7 @@
         const emailInput = document.getElementById("email");
         const passwordInput = document.getElementById("password");
         const loginBtn = document.getElementById("loginBtn");
-        const logoutBtn = document.getElementById("logoutBtn");
         const errorMessage = document.getElementById("errorMessage");
-        const userEmail = document.getElementById("userEmail");
         const flashEl = document.getElementById("flashEl");
         const flashBtn = document.getElementById("flashBtn");
         const adminPanel = document.getElementById("adminPanel");
@@ -274,7 +267,6 @@
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 // User is signed in
-                userEmail.textContent = user.email;
                 loginContainer.classList.add('hidden');
                 flashContainer.classList.remove('hidden');
                 
@@ -352,15 +344,6 @@
             }
         });
 
-        // Logout handler
-        logoutBtn.addEventListener('click', async () => {
-            try {
-                await signOut(auth);
-            } catch (error) {
-                console.error('Logout error:', error);
-                errorMessage.textContent = 'Logout failed: ' + error.message;
-            }
-        });
 
         // Store admin credentials temporarily
         let adminEmail = '';

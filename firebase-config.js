@@ -1,6 +1,14 @@
 // Firebase configuration
 // Replace these values with your Firebase project credentials
 // Get them from Firebase Console > Project Settings > General > Your apps
+//
+// SECURITY NOTE: These credentials are meant to be public (client-side).
+// Firebase API keys are NOT secrets - they're restricted by domain/hostname.
+// Real security is enforced by:
+// 1. Firestore Security Rules (data access control)
+// 2. Firebase Authentication (user identity)
+// 3. Domain restrictions in Google Cloud Console
+// To add extra protection, enable Firebase App Check in the console.
 
 const firebaseConfig = {
   apiKey: "AIzaSyBB3ZtqZMN_MK_wJ-7OnGtpNDn3iMtNyE8",
