@@ -165,8 +165,6 @@
     </div>
 
     <script type="module">
-        import { install } from 'https://unpkg.com/esp-web-tools@10/dist/web/install.js';
-        
         let serialPort = null;
         let isConnected = false;
         const FIRMWARE_PATH = './webflasher/firmwares/esp32fw.bin';
@@ -242,11 +240,25 @@
             }
 
             try {
-                document.getElementById('status').textContent = 'Preparing flash...';
                 document.getElementById('flashBtn').disabled = true;
                 document.getElementById('progress').classList.add('show');
                 document.getElementById('progressFill').style.width = '0%';
                 document.getElementById('progressFill').textContent = '0%';
+
+                // Dynamically import esp-web-tools
+                // Try different CDNs if one fails
+                let install;
+                try {
+                    const module = await import('https://unpkg.com/esp-web-tools@10/dist/web/install.js?module');
+                    install = module.install;
+                } catch (e1) {
+                    try {
+                        const module = await import('https://cdn.jsdelivr.net/npm/esp-web-tools@10/dist/web/install.js');
+                        install = module.install;
+                    } catch (e2) {
+                        throw new Error('Failed to load esp-web-tools. Make sure you are using HTTPS (GitHub Pages) or try a different browser.');
+                    }
+                }
 
                 // Create manifest object for esp-web-tools
                 const manifest = {
@@ -272,13 +284,13 @@
                     }
                 });
 
-                document.getElementById('status').textContent = 'Firmware flashed successfully!';
+                alert('Firmware flashed successfully!');
                 document.getElementById('progress').classList.remove('show');
                 document.getElementById('flashBtn').disabled = false;
 
             } catch (error) {
                 console.error('Flash error:', error);
-                document.getElementById('status').textContent = 'Flash failed: ' + error.message;
+                alert('Flash failed: ' + error.message);
                 document.getElementById('progress').classList.remove('show');
                 document.getElementById('flashBtn').disabled = false;
                 
