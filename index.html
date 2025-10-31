@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OL-33 FLASHER</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #FFE500;
+            margin: 0;
+            padding: 0;
+            color: #000;
+            font-weight: bold;
+            font-size: 16px;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: #f6f5e9;
+            border: 3px solid #000;
+            box-shadow: 3px 3px 0px #000;
+            padding: 40px;
+            border-radius: 24px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 24px;
+        }
+
+        .port-select {
+            margin-bottom: 20px;
+        }
+
+        .port-select select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #000;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 16px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 2px 2px 0px #000;
+            cursor: pointer;
+        }
+
+
+        .btn {
+            height: 50px;
+            padding: 0 24px;
+            border: 2px solid #000;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            background: #fff;
+            color: #000;
+            transition: all 0.2s ease;
+            box-shadow: 2px 2px 0px #000;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: scale(1.02);
+        }
+
+        .btn:active:not(:disabled) {
+            box-shadow: 0px 0px 0px rgba(0,0,0,1);
+            filter: brightness(0.85);
+            transform: translateY(1px) scale(1.02);
+        }
+
+        .btn:disabled {
+            border-color: #727272;
+            background: #D4D4D4 !important;
+            color: #676767 !important;
+            cursor: not-allowed;
+        }
+
+        .btn-connect {
+            background: #B8FF9F;
+        }
+
+        .btn-connect.connected {
+            background: #FF9F9F;
+        }
+
+        .btn-flash {
+            background: #A6FAFF;
+        }
+
+        .btn:focus, .btn:focus-visible {
+            outline: none;
+            box-shadow: 2px 2px 0px #000;
+        }
+
+        .progress {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            border: 2px solid #000;
+            border-radius: 12px;
+            box-shadow: 2px 2px 0px #000;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #B8FF9F;
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .progress.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>OL-33 FLASHER</h1>
+        
+        <div class="port-select">
+            <select id="portSelect">
+                <option value="">Select port...</option>
+            </select>
+        </div>
+
+        <button class="btn btn-connect" id="connectBtn">CONNECT</button>
+        <button class="btn btn-flash" id="flashBtn" disabled>FLASH</button>
+
+        <div class="progress" id="progress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill">0%</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { install } from 'https://unpkg.com/esp-web-tools@10/dist/web/install.js';
+        
+        let serialPort = null;
+        let isConnected = false;
+        const FIRMWARE_PATH = './firmwares/esp32fw.bin';
+
+        // Update port list
+        async function updatePortList() {
+            if (!navigator.serial) {
+                return;
+            }
+
+            try {
+                const ports = await navigator.serial.getPorts();
+                const select = document.getElementById('portSelect');
+                select.innerHTML = '<option value="">Select port...</option>';
+                
+                ports.forEach((port, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = port.getInfo().usbVendorId 
+                        ? `Port ${index + 1} (VID: 0x${port.getInfo().usbVendorId.toString(16)}, PID: 0x${port.getInfo().usbProductId.toString(16)})`
+                        : `Port ${index + 1}`;
+                    select.appendChild(option);
+                });
+
+                if (ports.length === 0) {
+                    select.innerHTML = '<option value="">No ports available. Click CONNECT to select.</option>';
+                }
+            } catch (error) {
+                console.error('Error getting ports:', error);
+            }
+        }
+
+        // Connect to serial port
+        async function connectSerial() {
+            if (!navigator.serial) {
+                alert('Web Serial API not supported. Please use Chrome or Edge.');
+                return;
+            }
+
+            try {
+                if (isConnected && serialPort) {
+                    // Disconnect
+                    await disconnectSerial();
+                    return;
+                }
+
+                // Request port if not selected
+                const select = document.getElementById('portSelect');
+                let port;
+
+                if (select.value !== '') {
+                    // Use previously selected port
+                    const ports = await navigator.serial.getPorts();
+                    port = ports[parseInt(select.value)];
+                } else {
+                    // Request new port
+                    port = await navigator.serial.requestPort();
+                }
+
+                serialPort = port;
+                // Don't open port here - esp-web-tools will handle it
+                // await serialPort.open({ baudRate: 115200 });
+
+                isConnected = true;
+                updateUI();
+                
+                // Update port list after connection
+                await updatePortList();
+
+            } catch (error) {
+                console.error('Connection error:', error);
+                alert('Connection failed: ' + error.message);
+                isConnected = false;
+                serialPort = null;
+                updateUI();
+            }
+        }
+
+        // Disconnect from serial port
+        async function disconnectSerial() {
+            try {
+                if (serialPort) {
+                    // Only close if port is open
+                    if (serialPort.readable || serialPort.writable) {
+                        const writer = serialPort.writable?.getWriter();
+                        if (writer) {
+                            await writer.releaseLock();
+                        }
+                        const reader = serialPort.readable?.getReader();
+                        if (reader) {
+                            await reader.cancel();
+                            await reader.releaseLock();
+                        }
+                        await serialPort.close();
+                    }
+                }
+                serialPort = null;
+                isConnected = false;
+                updateUI();
+                await updatePortList();
+            } catch (error) {
+                console.error('Disconnect error:', error);
+                // Port might already be closed
+                serialPort = null;
+                isConnected = false;
+                updateUI();
+            }
+        }
+
+        // Flash firmware using esp-web-tools
+        async function flashFirmware() {
+            if (!serialPort) {
+                alert('Please connect to a port first');
+                return;
+            }
+
+            try {
+                document.getElementById('status').textContent = 'Preparing flash...';
+                document.getElementById('flashBtn').disabled = true;
+                document.getElementById('progress').classList.add('show');
+                document.getElementById('progressFill').style.width = '0%';
+                document.getElementById('progressFill').textContent = '0%';
+
+                // Create manifest object for esp-web-tools
+                const manifest = {
+                    name: "ESP32 Firmware",
+                    version: "1.0",
+                    builds: [
+                        {
+                            chipFamily: "ESP32-S3",
+                            parts: [
+                                { path: FIRMWARE_PATH, offset: 0 }
+                            ]
+                        }
+                    ]
+                };
+
+                // Use esp-web-tools install function
+                await install(manifest, {
+                    port: serialPort,
+                    onProgress: (progress) => {
+                        const percent = Math.round(progress * 100);
+                        document.getElementById('progressFill').style.width = percent + '%';
+                        document.getElementById('progressFill').textContent = percent + '%';
+                    }
+                });
+
+                document.getElementById('status').textContent = 'Firmware flashed successfully!';
+                document.getElementById('progress').classList.remove('show');
+                document.getElementById('flashBtn').disabled = false;
+
+            } catch (error) {
+                console.error('Flash error:', error);
+                document.getElementById('status').textContent = 'Flash failed: ' + error.message;
+                document.getElementById('progress').classList.remove('show');
+                document.getElementById('flashBtn').disabled = false;
+                
+                // Close port on error
+                if (serialPort) {
+                    try {
+                        await disconnectSerial();
+                    } catch (e) {}
+                }
+            }
+        }
+
+        // Update UI based on connection state
+        function updateUI() {
+            const connectBtn = document.getElementById('connectBtn');
+            const flashBtn = document.getElementById('flashBtn');
+
+            if (isConnected) {
+                connectBtn.textContent = 'DISCONNECT';
+                connectBtn.classList.add('connected');
+                flashBtn.disabled = false;
+            } else {
+                connectBtn.textContent = 'CONNECT';
+                connectBtn.classList.remove('connected');
+                flashBtn.disabled = true;
+            }
+        }
+
+        // Event listeners
+        document.getElementById('connectBtn').addEventListener('click', connectSerial);
+        document.getElementById('flashBtn').addEventListener('click', flashFirmware);
+
+        // Initialize
+        updatePortList();
+        updateUI();
+    </script>
+</body>
+</html>
