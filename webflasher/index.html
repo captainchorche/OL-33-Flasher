@@ -43,23 +43,9 @@
             font-size: 24px;
         }
 
-        .port-select {
-            margin-bottom: 20px;
+        .flash-area {
+            margin: 20px 0;
         }
-
-        .port-select select {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #000;
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
-            font-size: 16px;
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 2px 2px 0px #000;
-            cursor: pointer;
-        }
-
 
         .btn {
             height: 50px;
@@ -71,7 +57,7 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             cursor: pointer;
-            background: #fff;
+            background: #A6FAFF;
             color: #000;
             transition: all 0.2s ease;
             box-shadow: 2px 2px 0px #000;
@@ -81,14 +67,13 @@
             justify-content: center;
             user-select: none;
             width: 100%;
-            margin-bottom: 15px;
         }
 
-        .btn:hover:not(:disabled) {
+        .btn:hover:not([disabled]) {
             transform: scale(1.02);
         }
 
-        .btn:active:not(:disabled) {
+        .btn:active:not([disabled]) {
             box-shadow: 0px 0px 0px rgba(0,0,0,1);
             filter: brightness(0.85);
             transform: translateY(1px) scale(1.02);
@@ -101,230 +86,55 @@
             cursor: not-allowed;
         }
 
-        .btn-connect {
-            background: #B8FF9F;
-        }
-
-        .btn-connect.connected {
-            background: #FF9F9F;
-        }
-
-        .btn-flash {
-            background: #A6FAFF;
-        }
-
         .btn:focus, .btn:focus-visible {
             outline: none;
             box-shadow: 2px 2px 0px #000;
         }
-
-        .progress {
-            margin-top: 20px;
-            display: none;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 30px;
-            border: 2px solid #000;
-            border-radius: 12px;
-            box-shadow: 2px 2px 0px #000;
-            overflow: hidden;
-            background: #fff;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: #B8FF9F;
-            width: 0%;
-            transition: width 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 12px;
-        }
-
-        .progress.show {
-            display: block;
-        }
     </style>
+    <!-- ESP Web Tools -->
+    <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
 </head>
 <body>
     <div class="container">
         <h1>OL-33 FLASHER</h1>
-
-        <button class="btn btn-connect" id="connectBtn">CONNECT</button>
-        <button class="btn btn-flash" id="flashBtn" disabled>FLASH</button>
-
-        <div class="progress" id="progress">
-            <div class="progress-bar">
-                <div class="progress-fill" id="progressFill">0%</div>
-            </div>
+        
+        <div class="flash-area">
+            <esp-web-install-button id="flashEl">
+                <button id="flashBtn" class="btn" slot="activate" disabled>FLASH</button>
+                <span slot="unsupported">Browser doesn't support Web Serial.</span>
+                <span slot="not-allowed">Needs HTTPS (or localhost).</span>
+            </esp-web-install-button>
         </div>
     </div>
 
     <script type="module">
-        let serialPort = null;
-        let isConnected = false;
-        const FIRMWARE_PATH = './webflasher/firmwares/esp32fw.bin';
+        const flashEl = document.getElementById("flashEl");
+        const flashBtn = document.getElementById("flashBtn");
 
-        // Connect to serial port
-        async function connectSerial() {
-            if (!navigator.serial) {
-                alert('Web Serial API not supported. Please use Chrome or Edge.');
-                return;
-            }
-
-            try {
-                if (isConnected && serialPort) {
-                    // Disconnect
-                    await disconnectSerial();
-                    return;
-                }
-
-                // Request port - opens dialog to select device
-                const port = await navigator.serial.requestPort();
-
-                serialPort = port;
-                // Don't open port here - esp-web-tools will handle it
-                // await serialPort.open({ baudRate: 115200 });
-
-                isConnected = true;
-                updateUI();
-
-            } catch (error) {
-                console.error('Connection error:', error);
-                alert('Connection failed: ' + error.message);
-                isConnected = false;
-                serialPort = null;
-                updateUI();
-            }
-        }
-
-        // Disconnect from serial port
-        async function disconnectSerial() {
-            try {
-                if (serialPort) {
-                    // Only close if port is open
-                    if (serialPort.readable || serialPort.writable) {
-                        const writer = serialPort.writable?.getWriter();
-                        if (writer) {
-                            await writer.releaseLock();
-                        }
-                        const reader = serialPort.readable?.getReader();
-                        if (reader) {
-                            await reader.cancel();
-                            await reader.releaseLock();
-                        }
-                        await serialPort.close();
-                    }
-                }
-                serialPort = null;
-                isConnected = false;
-                updateUI();
-            } catch (error) {
-                console.error('Disconnect error:', error);
-                // Port might already be closed
-                serialPort = null;
-                isConnected = false;
-                updateUI();
-            }
-        }
-
-        // Flash firmware using esp-web-tools
-        async function flashFirmware() {
-            if (!serialPort) {
-                alert('Please connect to a port first');
-                return;
-            }
-
-            try {
-                document.getElementById('flashBtn').disabled = true;
-                document.getElementById('progress').classList.add('show');
-                document.getElementById('progressFill').style.width = '0%';
-                document.getElementById('progressFill').textContent = '0%';
-
-                // Dynamically import esp-web-tools
-                // Try different CDNs if one fails
-                let install;
-                try {
-                    const module = await import('https://unpkg.com/esp-web-tools@10/dist/web/install.js?module');
-                    install = module.install;
-                } catch (e1) {
-                    try {
-                        const module = await import('https://cdn.jsdelivr.net/npm/esp-web-tools@10/dist/web/install.js');
-                        install = module.install;
-                    } catch (e2) {
-                        throw new Error('Failed to load esp-web-tools. Make sure you are using HTTPS (GitHub Pages) or try a different browser.');
-                    }
-                }
-
-                // Create manifest object for esp-web-tools
-                const manifest = {
-                    name: "ESP32 Firmware",
-                    version: "1.0",
-                    builds: [
-                        {
-                            chipFamily: "ESP32-S3",
-                            parts: [
-                                { path: FIRMWARE_PATH, offset: 0 }
-                            ]
-                        }
+        // Create manifest inline
+        const manifest = {
+            name: "OL-33 Firmware",
+            version: "1.0",
+            builds: [
+                {
+                    chipFamily: "ESP32-S3",
+                    parts: [
+                        { path: "./webflasher/firmwares/esp32fw.bin", offset: 0 }
                     ]
-                };
-
-                // Use esp-web-tools install function
-                await install(manifest, {
-                    port: serialPort,
-                    onProgress: (progress) => {
-                        const percent = Math.round(progress * 100);
-                        document.getElementById('progressFill').style.width = percent + '%';
-                        document.getElementById('progressFill').textContent = percent + '%';
-                    }
-                });
-
-                alert('Firmware flashed successfully!');
-                document.getElementById('progress').classList.remove('show');
-                document.getElementById('flashBtn').disabled = false;
-
-            } catch (error) {
-                console.error('Flash error:', error);
-                alert('Flash failed: ' + error.message);
-                document.getElementById('progress').classList.remove('show');
-                document.getElementById('flashBtn').disabled = false;
-                
-                // Close port on error
-                if (serialPort) {
-                    try {
-                        await disconnectSerial();
-                    } catch (e) {}
                 }
-            }
+            ]
+        };
+
+        // Set manifest on the button
+        if (flashEl) {
+            flashEl.manifest = manifest;
         }
 
-        // Update UI based on connection state
-        function updateUI() {
-            const connectBtn = document.getElementById('connectBtn');
-            const flashBtn = document.getElementById('flashBtn');
-
-            if (isConnected) {
-                connectBtn.textContent = 'DISCONNECT';
-                connectBtn.classList.add('connected');
-                flashBtn.disabled = false;
-            } else {
-                connectBtn.textContent = 'CONNECT';
-                connectBtn.classList.remove('connected');
-                flashBtn.disabled = true;
-            }
+        // Enable button
+        if (flashBtn) {
+            flashBtn.disabled = false;
+            flashBtn.removeAttribute('disabled');
         }
-
-        // Event listeners
-        document.getElementById('connectBtn').addEventListener('click', connectSerial);
-        document.getElementById('flashBtn').addEventListener('click', flashFirmware);
-
-        // Initialize
-        updateUI();
     </script>
 </body>
 </html>
