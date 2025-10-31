@@ -259,8 +259,20 @@
                     ]
                 };
 
-                // Dynamically import esp-web-tools (using jsdelivr CDN for better CORS support)
-                const { install } = await import('https://cdn.jsdelivr.net/npm/esp-web-tools@10/dist/web/install.js');
+                // Dynamically import esp-web-tools
+                // Try different CDNs if one fails
+                let install;
+                try {
+                    const module = await import('https://unpkg.com/esp-web-tools@10/dist/web/install.js?module');
+                    install = module.install;
+                } catch (e1) {
+                    try {
+                        const module = await import('https://cdn.jsdelivr.net/npm/esp-web-tools@10/dist/web/install.js');
+                        install = module.install;
+                    } catch (e2) {
+                        throw new Error('Failed to load esp-web-tools. Make sure you are using HTTPS (GitHub Pages) or try a different browser.');
+                    }
+                }
 
                 // Use esp-web-tools install function
                 await install(manifest, {
