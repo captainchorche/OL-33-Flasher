@@ -90,6 +90,94 @@
             outline: none;
             box-shadow: 2px 2px 0px #000;
         }
+
+        /* Login form styles */
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            text-align: left;
+        }
+
+        .input-group label {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .input-group input {
+            height: 45px;
+            padding: 0 16px;
+            border: 2px solid #000;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 14px;
+            border-radius: 12px;
+            box-shadow: 2px 2px 0px #000;
+            background: #fff;
+            color: #000;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            box-shadow: 2px 2px 0px #000;
+        }
+
+        .error-message {
+            color: #d32f2f;
+            font-size: 14px;
+            margin-top: 8px;
+            min-height: 20px;
+        }
+
+        .user-info {
+            margin: 20px 0;
+            padding: 12px;
+            background: #A6FAFF;
+            border: 2px solid #000;
+            border-radius: 12px;
+            font-size: 14px;
+        }
+
+        .logout-btn {
+            margin-top: 12px;
+            background: #ff6b6b;
+            font-size: 14px;
+            height: 40px;
+        }
+
+        .admin-panel {
+            margin: 20px 0;
+            padding: 16px;
+            background: #fff3cd;
+            border: 2px solid #000;
+            border-radius: 12px;
+            text-align: left;
+        }
+
+        .admin-panel h3 {
+            margin-bottom: 12px;
+            font-size: 16px;
+            text-transform: uppercase;
+        }
+
+        .admin-btn {
+            background: #4caf50;
+            margin-top: 8px;
+            height: 40px;
+            font-size: 14px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
     </style>
     <!-- ESP Web Tools -->
     <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
@@ -100,45 +188,291 @@
     <div class="container">
         <h1>OL-33 FLASHER</h1>
         
-        <div class="flash-area">
-            <esp-web-install-button id="flashEl">
-                <button id="flashBtn" class="btn" slot="activate" disabled>FLASH</button>
-                <span slot="unsupported">Browser doesn't support Web Serial.</span>
-                <span slot="not-allowed">Needs HTTPS (or localhost).</span>
-            </esp-web-install-button>
+        <!-- Login Form -->
+        <div id="loginContainer" class="login-form">
+            <div class="input-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" placeholder="your@email.com" required>
+            </div>
+            <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="••••••••" required>
+            </div>
+            <button id="loginBtn" class="btn">LOGIN</button>
+            <div class="error-message" id="errorMessage"></div>
+        </div>
+
+        <!-- Flash Area (shown after login) -->
+        <div id="flashContainer" class="hidden">
+            <div class="user-info">
+                <div>Logged in as: <strong id="userEmail"></strong></div>
+                <button id="logoutBtn" class="btn logout-btn">LOGOUT</button>
+            </div>
+
+            <!-- Admin Panel (only for admins) -->
+            <div id="adminPanel" class="admin-panel hidden">
+                <h3>Admin Panel - Create User</h3>
+                <div class="input-group">
+                    <label for="newUserEmail">New User Email</label>
+                    <input type="email" id="newUserEmail" placeholder="user@example.com">
+                </div>
+                <div class="input-group">
+                    <label for="newUserPassword">New User Password</label>
+                    <input type="password" id="newUserPassword" placeholder="••••••••">
+                </div>
+                <button id="createUserBtn" class="btn admin-btn">CREATE USER</button>
+                <div class="error-message" id="adminMessage"></div>
+            </div>
+            
+            <div class="flash-area">
+                <esp-web-install-button id="flashEl">
+                    <button id="flashBtn" class="btn" slot="activate" disabled>FLASH</button>
+                    <span slot="unsupported">Browser doesn't support Web Serial.</span>
+                    <span slot="not-allowed">Needs HTTPS (or localhost).</span>
+                </esp-web-install-button>
+            </div>
         </div>
     </div>
 
     <script type="module">
-        import { db, initAnalytics } from './firebase-config.js';
-        import { collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { db, auth, initAnalytics } from './firebase-config.js';
+        import { signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
+        // DOM elements
+        const loginContainer = document.getElementById("loginContainer");
+        const flashContainer = document.getElementById("flashContainer");
+        const emailInput = document.getElementById("email");
+        const passwordInput = document.getElementById("password");
+        const loginBtn = document.getElementById("loginBtn");
+        const logoutBtn = document.getElementById("logoutBtn");
+        const errorMessage = document.getElementById("errorMessage");
+        const userEmail = document.getElementById("userEmail");
         const flashEl = document.getElementById("flashEl");
         const flashBtn = document.getElementById("flashBtn");
+        const adminPanel = document.getElementById("adminPanel");
+        const newUserEmail = document.getElementById("newUserEmail");
+        const newUserPassword = document.getElementById("newUserPassword");
+        const createUserBtn = document.getElementById("createUserBtn");
+        const adminMessage = document.getElementById("adminMessage");
 
         // Initialize Analytics
         let analytics = await initAnalytics();
 
-        // Set manifest URL on the button
-        if (flashEl) {
-            flashEl.setAttribute('manifest', './manifest.json');
+        // Check if user is admin
+        async function isAdmin(userId) {
+            try {
+                const adminDoc = await getDoc(doc(db, 'admins', userId));
+                return adminDoc.exists();
+            } catch (error) {
+                console.error('Error checking admin status:', error);
+                return false;
+            }
         }
 
-        // Enable button
-        if (flashBtn) {
-            flashBtn.disabled = false;
-            flashBtn.removeAttribute('disabled');
-        }
+        // Check authentication state
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // User is signed in
+                userEmail.textContent = user.email;
+                loginContainer.classList.add('hidden');
+                flashContainer.classList.remove('hidden');
+                
+                // Check if user is admin
+                const admin = await isAdmin(user.uid);
+                if (admin) {
+                    adminPanel.classList.remove('hidden');
+                } else {
+                    adminPanel.classList.add('hidden');
+                }
+                
+                // Set manifest URL on the button
+                if (flashEl) {
+                    flashEl.setAttribute('manifest', './manifest.json');
+                }
+
+                // Enable button
+                if (flashBtn) {
+                    flashBtn.disabled = false;
+                    flashBtn.removeAttribute('disabled');
+                }
+            } else {
+                // User is signed out
+                loginContainer.classList.remove('hidden');
+                flashContainer.classList.add('hidden');
+                adminPanel.classList.add('hidden');
+                emailInput.value = '';
+                passwordInput.value = '';
+                errorMessage.textContent = '';
+            }
+        });
+
+        // Login handler
+        loginBtn.addEventListener('click', async () => {
+            const email = emailInput.value.trim();
+            const password = passwordInput.value;
+
+            if (!email || !password) {
+                errorMessage.textContent = 'Please enter email and password';
+                return;
+            }
+
+            errorMessage.textContent = '';
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'LOGGING IN...';
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                // Auth state change will handle UI update
+            } catch (error) {
+                console.error('Login error:', error);
+                let errorMsg = 'Login failed. ';
+                if (error.code === 'auth/user-not-found') {
+                    errorMsg += 'User not found.';
+                } else if (error.code === 'auth/wrong-password') {
+                    errorMsg += 'Wrong password.';
+                } else if (error.code === 'auth/invalid-email') {
+                    errorMsg += 'Invalid email address.';
+                } else if (error.code === 'auth/invalid-credential') {
+                    errorMsg += 'Invalid email or password.';
+                } else {
+                    errorMsg += error.message;
+                }
+                errorMessage.textContent = errorMsg;
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'LOGIN';
+            }
+        });
+
+        // Allow Enter key to submit login
+        passwordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                loginBtn.click();
+            }
+        });
+
+        // Logout handler
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+            } catch (error) {
+                console.error('Logout error:', error);
+                errorMessage.textContent = 'Logout failed: ' + error.message;
+            }
+        });
+
+        // Store admin credentials temporarily
+        let adminEmail = '';
+        let adminPassword = '';
+
+        // Save admin credentials on login
+        loginBtn.addEventListener('click', () => {
+            adminEmail = emailInput.value.trim();
+            adminPassword = passwordInput.value;
+        });
+
+        // Create user handler (admin only)
+        createUserBtn.addEventListener('click', async () => {
+            const email = newUserEmail.value.trim();
+            const password = newUserPassword.value;
+
+            if (!email || !password) {
+                adminMessage.textContent = 'Please enter email and password';
+                adminMessage.style.color = '#d32f2f';
+                return;
+            }
+
+            if (password.length < 6) {
+                adminMessage.textContent = 'Password must be at least 6 characters';
+                adminMessage.style.color = '#d32f2f';
+                return;
+            }
+
+            adminMessage.textContent = '';
+            createUserBtn.disabled = true;
+            createUserBtn.textContent = 'CREATING...';
+
+            const user = auth.currentUser;
+            if (!user || !(await isAdmin(user.uid))) {
+                adminMessage.textContent = 'Access denied. Admin rights required.';
+                adminMessage.style.color = '#d32f2f';
+                createUserBtn.disabled = false;
+                createUserBtn.textContent = 'CREATE USER';
+                return;
+            }
+
+            // Save current admin credentials
+            const currentAdminEmail = user.email;
+            const currentAdminPassword = adminPassword || prompt(`Enter password for ${currentAdminEmail} to continue:`);
+            
+            if (!currentAdminPassword) {
+                adminMessage.textContent = 'Password required to create user';
+                adminMessage.style.color = '#d32f2f';
+                createUserBtn.disabled = false;
+                createUserBtn.textContent = 'CREATE USER';
+                return;
+            }
+
+            try {
+                // Create the new user (this will sign them in automatically)
+                await createUserWithEmailAndPassword(auth, email, password);
+                
+                // Immediately sign out the newly created user
+                await signOut(auth);
+                
+                // Sign back in as admin
+                await signInWithEmailAndPassword(auth, currentAdminEmail, currentAdminPassword);
+                
+                adminMessage.textContent = `User ${email} created successfully!`;
+                adminMessage.style.color = '#2e7d32';
+                newUserEmail.value = '';
+                newUserPassword.value = '';
+            } catch (error) {
+                console.error('Create user error:', error);
+                let errorMsg = 'Failed to create user. ';
+                if (error.code === 'auth/email-already-in-use') {
+                    errorMsg += 'Email already exists.';
+                } else if (error.code === 'auth/invalid-email') {
+                    errorMsg += 'Invalid email address.';
+                } else if (error.code === 'auth/weak-password') {
+                    errorMsg += 'Password is too weak.';
+                } else if (error.code === 'auth/operation-not-allowed') {
+                    errorMsg += 'Email/password sign-up is disabled. Enable it in Firebase Console > Authentication > Sign-in method, OR use Firebase Console to create users manually.';
+                } else {
+                    errorMsg += error.message;
+                }
+                adminMessage.textContent = errorMsg;
+                adminMessage.style.color = '#d32f2f';
+                
+                // Try to sign back in as admin if we got signed out
+                try {
+                    if (!auth.currentUser) {
+                        await signInWithEmailAndPassword(auth, currentAdminEmail, currentAdminPassword);
+                    }
+                } catch (signInError) {
+                    console.error('Failed to sign back in:', signInError);
+                }
+            } finally {
+                createUserBtn.disabled = false;
+                createUserBtn.textContent = 'CREATE USER';
+            }
+        });
 
         // Firebase: Log flash events
         flashEl.addEventListener('state-changed', async (event) => {
             const state = event.detail;
+            const user = auth.currentUser;
+            
+            if (!user) return; // Don't log if user is not authenticated
             
             // Log to Firestore when flash starts
             if (state === 'installing') {
                 try {
                     await addDoc(collection(db, 'flash_events'), {
                         event: 'flash_started',
+                        userId: user.uid,
+                        userEmail: user.email,
                         timestamp: serverTimestamp(),
                         userAgent: navigator.userAgent
                     });
@@ -152,6 +486,8 @@
                 try {
                     await addDoc(collection(db, 'flash_events'), {
                         event: 'flash_completed',
+                        userId: user.uid,
+                        userEmail: user.email,
                         timestamp: serverTimestamp(),
                         userAgent: navigator.userAgent
                     });
@@ -160,7 +496,8 @@
                     if (analytics) {
                         const { logEvent } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js');
                         logEvent(analytics, 'firmware_flashed', {
-                            firmware_version: 'OL33-1.0'
+                            firmware_version: 'OL33-1.0',
+                            user_id: user.uid
                         });
                     }
                 } catch (error) {

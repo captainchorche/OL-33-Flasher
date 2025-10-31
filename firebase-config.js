@@ -15,12 +15,16 @@ const firebaseConfig = {
 // Initialize Firebase (modular SDK)
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
 import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { getAuth } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
 // Initialize Firestore
 export const db = getFirestore(app);
+
+// Initialize Authentication
+export const auth = getAuth(app);
 
 // Initialize Analytics (async, only in browser)
 export async function initAnalytics() {
