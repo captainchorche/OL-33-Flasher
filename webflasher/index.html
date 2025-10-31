@@ -165,8 +165,6 @@
     </div>
 
     <script type="module">
-        import { install } from 'https://unpkg.com/esp-web-tools@10/dist/web/install.js';
-        
         let serialPort = null;
         let isConnected = false;
         const FIRMWARE_PATH = './webflasher/firmwares/esp32fw.bin';
@@ -242,7 +240,6 @@
             }
 
             try {
-                document.getElementById('status').textContent = 'Preparing flash...';
                 document.getElementById('flashBtn').disabled = true;
                 document.getElementById('progress').classList.add('show');
                 document.getElementById('progressFill').style.width = '0%';
@@ -262,6 +259,9 @@
                     ]
                 };
 
+                // Dynamically import esp-web-tools
+                const { install } = await import('https://unpkg.com/esp-web-tools@10/dist/web/install.js');
+
                 // Use esp-web-tools install function
                 await install(manifest, {
                     port: serialPort,
@@ -272,13 +272,13 @@
                     }
                 });
 
-                document.getElementById('status').textContent = 'Firmware flashed successfully!';
+                alert('Firmware flashed successfully!');
                 document.getElementById('progress').classList.remove('show');
                 document.getElementById('flashBtn').disabled = false;
 
             } catch (error) {
                 console.error('Flash error:', error);
-                document.getElementById('status').textContent = 'Flash failed: ' + error.message;
+                alert('Flash failed: ' + error.message);
                 document.getElementById('progress').classList.remove('show');
                 document.getElementById('flashBtn').disabled = false;
                 
